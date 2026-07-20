@@ -78,6 +78,11 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(Classifier.framework(arguments: "/usr/libexec/rapportd"), .unknown)
     }
 
+    func testDoesNotMatchMarkerAsSubstringOfUnrelatedPath() {
+        XCTAssertEqual(Classifier.framework(arguments: "node /Users/dev/my-rails-experiments/server.js"), .node)
+        XCTAssertEqual(Classifier.framework(arguments: "python3 /Users/dev/webpack-notes/analyze.py"), .python)
+    }
+
     func testKindClassification() {
         XCTAssertEqual(Classifier.kind(executable: "/usr/libexec/rapportd", framework: .unknown), .other)
         XCTAssertEqual(Classifier.kind(executable: "/System/Library/CoreServices/x", framework: .unknown), .other)
@@ -100,5 +105,12 @@ final class ProjectNamerTests: XCTestCase {
     func testRootAndHomeAreNotProjects() {
         XCTAssertNil(ProjectNamer.projectName(cwd: "/"))
         XCTAssertNil(ProjectNamer.projectName(cwd: NSHomeDirectory()))
+    }
+
+    func testFolderUnderHomeWithoutManifestIsNotAProject() throws {
+        let dir = NSHomeDirectory() + "/portside-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        XCTAssertNil(ProjectNamer.projectName(cwd: dir))
     }
 }
