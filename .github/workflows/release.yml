@@ -13,9 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stamp version from tag
-        run: /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${GITHUB_REF_NAME#v}" Support/Info.plist
-
       - name: Build app bundle
         run: ./scripts/build-app.sh
 
@@ -31,8 +28,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/Portside.dmg dist/Portside.dmg.sha256 \
-            --title "Portside ${GITHUB_REF_NAME#v}" --generate-notes
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # A retry after a prior partial failure on this same tag — the
+            # release already exists, so overwrite its assets instead of
+            # erroring out with no clean recovery.
+            gh release upload "$GITHUB_REF_NAME" dist/Portside.dmg dist/Portside.dmg.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/Portside.dmg dist/Portside.dmg.sha256 \
+              --title "Portside ${GITHUB_REF_NAME#v}" --generate-notes
+          fi
 
       - name: Update Homebrew tap
         env:
