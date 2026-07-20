@@ -57,8 +57,10 @@ final class AppModel {
     }
 
     /// Returns a URL reachable from other devices on the Wi-Fi. Servers bound
-    /// to all interfaces are reachable directly; loopback-bound ones get a relay.
-    func startSharing(_ server: DevServer) -> ActiveShare? {
+    /// to all interfaces are reachable directly; loopback-bound ones get a
+    /// relay. `ShareProxy`'s init can block briefly waiting for its listener,
+    /// so — like `PortScanner.scan()` — it's built off the main actor.
+    func startSharing(_ server: DevServer) async -> ActiveShare? {
         if let existing = shares[server.port] { return existing }
         guard let ip = lanAddress else { return nil }
 
@@ -67,9 +69,20 @@ final class AppModel {
             shares[server.port] = share
             return share
         }
-        guard let relay = try? ShareProxy(targetPort: server.port), relay.listenPort > 0 else {
-            return nil
+
+        let targetPort = server.port
+        let relay = await Task.detached(priority: .utility) {
+            try? ShareProxy(targetPort: targetPort)
+        }.value
+
+        // Another call could have started (or stopped) a share for this port
+        // while we were suspended constructing the relay above.
+        if let existing = shares[server.port] {
+            relay?.stop()
+            return existing
         }
+        guard let relay, relay.listenPort > 0 else { return nil }
+
         relays[server.port] = relay
         let share = ActiveShare(url: URL(string: "http://\(ip):\(relay.listenPort)")!, isRelayed: true)
         shares[server.port] = share

@@ -55,7 +55,7 @@ enum CLI {
             print("Relaying 127.0.0.1:\(port) -> http://\(ip):\(proxy.listenPort)  (Ctrl-C to stop)")
             dispatchMain()
         } catch {
-            print("error: \(error)")
+            print("error: \(error.localizedDescription)")
             exit(1)
         }
     }

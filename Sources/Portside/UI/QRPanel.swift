@@ -67,6 +67,6 @@ struct QRPanel: View {
         )
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
-        .onAppear { share = model.startSharing(server) }
+        .task { share = await model.startSharing(server) }
     }
 }
