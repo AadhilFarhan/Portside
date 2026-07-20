@@ -156,7 +156,7 @@ Your phone can't reach `127.0.0.1:3000` on your Mac, and most dev servers bind o
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
-- Apple silicon or Intel
+- Apple silicon (the released build is arm64-only)
 
 ---
 
