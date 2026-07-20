@@ -4,6 +4,7 @@ public enum Classifier {
 
     public static func framework(arguments: String) -> Framework {
         let args = arguments.lowercased()
+        let tokens = args.split(separator: " ").map(String.init)
         let exe = ((arguments.split(separator: " ").first).map(String.init) ?? "" as String)
         let exeName = (exe as NSString).lastPathComponent.lowercased()
 
@@ -24,7 +25,7 @@ public enum Classifier {
             ("php-fpm", .php),
             ("gradle", .java), ("spring", .java),
         ]
-        for (marker, framework) in markers where args.contains(marker) {
+        for (marker, framework) in markers where matches(marker, args: args, tokens: tokens) {
             return framework
         }
 
@@ -45,6 +46,17 @@ public enum Classifier {
             return .docker
         }
         return .unknown
+    }
+
+    /// A one-word marker (e.g. "vite", "rails") must match a whole token or a
+    /// token's path basename — never an arbitrary substring — so a project
+    /// folder that happens to contain the marker's text (`my-rails-app`,
+    /// `webpack-notes`) doesn't get misclassified. Multi-word markers
+    /// ("next dev", "manage.py runserver") represent a specific consecutive
+    /// phrase, which a plain substring check on the full string handles fine.
+    private static func matches(_ marker: String, args: String, tokens: [String]) -> Bool {
+        guard !marker.contains(" ") else { return args.contains(marker) }
+        return tokens.contains { $0 == marker || ($0 as NSString).lastPathComponent == marker }
     }
 
     /// Dev servers get top billing; OS daemons and ordinary apps go to "Other".
@@ -92,7 +104,7 @@ public enum ProjectNamer {
             .contains { $0.hasSuffix(".csproj") || $0.hasSuffix(".fsproj") || $0.hasSuffix(".xcodeproj") }
             ?? false
 
-        if hasManifest || hasProjectFile || cwd.hasPrefix(NSHomeDirectory()) {
+        if hasManifest || hasProjectFile {
             return (cwd as NSString).lastPathComponent
         }
         return nil
