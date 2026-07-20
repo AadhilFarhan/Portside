@@ -19,6 +19,7 @@ final class AppModel {
     private(set) var hasScannedOnce = false
 
     private var relays: [Int: ShareProxy] = [:]
+    private var sharedPIDs: [Int: Int32] = [:]
     private var pollTask: Task<Void, Never>?
 
     init() {
@@ -37,12 +38,16 @@ final class AppModel {
         otherServers = servers.filter { $0.kind == .other }
         hasScannedOnce = true
 
-        // Drop relays whose target vanished (server was stopped elsewhere).
-        let livePorts = Set(servers.map(\.port))
-        for (port, relay) in relays where !livePorts.contains(port) {
-            relay.stop()
+        // Drop shares whose process vanished, or whose port now belongs to a
+        // different process than the one the user actually chose to share —
+        // a share must never silently start exposing a process nobody opted
+        // into just because it happened to reuse a freed port.
+        let livePIDsByPort = Dictionary(servers.map { ($0.port, $0.pid) }, uniquingKeysWith: { first, _ in first })
+        for port in Array(sharedPIDs.keys) where livePIDsByPort[port] != sharedPIDs[port] {
+            relays[port]?.stop()
             relays[port] = nil
             shares[port] = nil
+            sharedPIDs[port] = nil
         }
     }
 
@@ -65,6 +70,7 @@ final class AppModel {
         if server.scope == .allInterfaces {
             let share = ActiveShare(url: URL(string: "http://\(ip):\(server.port)")!, isRelayed: false)
             shares[server.port] = share
+            sharedPIDs[server.port] = server.pid
             return share
         }
         guard let relay = try? ShareProxy(targetPort: server.port), relay.listenPort > 0 else {
@@ -73,6 +79,7 @@ final class AppModel {
         relays[server.port] = relay
         let share = ActiveShare(url: URL(string: "http://\(ip):\(relay.listenPort)")!, isRelayed: true)
         shares[server.port] = share
+        sharedPIDs[server.port] = server.pid
         return share
     }
 
@@ -80,5 +87,6 @@ final class AppModel {
         relays[port]?.stop()
         relays[port] = nil
         shares[port] = nil
+        sharedPIDs[port] = nil
     }
 }
