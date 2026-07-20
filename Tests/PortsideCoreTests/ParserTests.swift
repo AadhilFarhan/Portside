@@ -57,6 +57,11 @@ final class PsParserTests: XCTestCase {
         XCTAssertEqual(rows[912]?.elapsed, 93784.0)
     }
 
+    func testEmptyArgumentsDoesNotCrash() {
+        let details = ProcessDetails(pid: 1, cpuPercent: 0, residentBytes: 0, elapsed: 0, arguments: "")
+        XCTAssertEqual(details.executable, "")
+    }
+
     func testElapsedFormats() {
         XCTAssertEqual(PsParser.parseElapsed("00:05"), 5)
         XCTAssertEqual(PsParser.parseElapsed("01:02:03"), 3723)
