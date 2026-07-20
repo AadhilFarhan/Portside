@@ -13,7 +13,6 @@ struct MenuContent: View {
             content
         }
         .frame(width: 340)
-        .task { await model.refresh() }
     }
 
     private var header: some View {
