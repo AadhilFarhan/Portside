@@ -70,6 +70,57 @@ final class PsParserTests: XCTestCase {
     }
 }
 
+final class PsCommParserTests: XCTestCase {
+
+    func testParsesSimpleCommand() {
+        let result = PsCommParser.parse("  358 node")
+        XCTAssertEqual(result[358], "node")
+    }
+
+    func testHandlesCommandNameWithSpaces() {
+        // comm is the only column after pid, so everything remaining belongs to it.
+        let result = PsCommParser.parse("  1234 Google Chrome Helper")
+        XCTAssertEqual(result[1234], "Google Chrome Helper")
+    }
+
+    func testSkipsLinesWithoutAComm() {
+        let output = """
+          358 node
+        garbage
+          912
+        """
+        let result = PsCommParser.parse(output)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[358], "node")
+    }
+}
+
+final class PortScannerCwdParsingTests: XCTestCase {
+
+    func testParsesPidCwdPairs() {
+        let output = """
+        p358
+        n/Users/dev/my-app
+        p912
+        n/Users/dev/other-app
+        """
+        let result = PortScanner.parseCwds(output)
+        XCTAssertEqual(result[358], "/Users/dev/my-app")
+        XCTAssertEqual(result[912], "/Users/dev/other-app")
+    }
+
+    func testIgnoresPathsBeforeAnyPid() {
+        let output = """
+        ngarbage-before-any-pid
+        p358
+        n/Users/dev/my-app
+        """
+        let result = PortScanner.parseCwds(output)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[358], "/Users/dev/my-app")
+    }
+}
+
 final class ClassifierTests: XCTestCase {
 
     func testFrameworkDetection() {
@@ -81,6 +132,31 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(Classifier.framework(arguments: "/opt/homebrew/bin/node server.js"), .node)
         XCTAssertEqual(Classifier.framework(arguments: "/opt/homebrew/opt/postgresql@16/bin/postgres -D /opt/homebrew/var"), .postgres)
         XCTAssertEqual(Classifier.framework(arguments: "/usr/libexec/rapportd"), .unknown)
+    }
+
+    func testFrameworkDetectionRemainingCases() {
+        XCTAssertEqual(Classifier.framework(arguments: "node node_modules/.bin/nuxt dev"), .nuxt)
+        XCTAssertEqual(Classifier.framework(arguments: "node node_modules/.bin/astro dev"), .astro)
+        XCTAssertEqual(Classifier.framework(arguments: "node node_modules/.bin/remix dev"), .remix)
+        XCTAssertEqual(Classifier.framework(arguments: "node node_modules/.bin/react-scripts start"), .cra)
+        XCTAssertEqual(Classifier.framework(arguments: "node node_modules/.bin/webpack serve"), .webpack)
+        XCTAssertEqual(Classifier.framework(arguments: "flask run"), .flask)
+        XCTAssertEqual(Classifier.framework(arguments: "php artisan serve"), .laravel)
+        XCTAssertEqual(Classifier.framework(arguments: "/usr/sbin/php-fpm --nodaemonize"), .php)
+        XCTAssertEqual(Classifier.framework(arguments: "gradle bootRun"), .java)
+        XCTAssertEqual(Classifier.framework(arguments: "go run main.go"), .go)
+        XCTAssertEqual(Classifier.framework(arguments: "cargo run"), .rust)
+        XCTAssertEqual(Classifier.framework(arguments: "dotnet MyApp.dll"), .dotnet)
+        XCTAssertEqual(Classifier.framework(arguments: "java -jar app.jar"), .java)
+        XCTAssertEqual(Classifier.framework(arguments: "mysqld --datadir=/opt/homebrew/var/mysql"), .mysql)
+        XCTAssertEqual(Classifier.framework(arguments: "redis-server /opt/homebrew/etc/redis.conf"), .redis)
+        XCTAssertEqual(Classifier.framework(arguments: "mongod --dbpath /data/db"), .mongo)
+        XCTAssertEqual(Classifier.framework(arguments: "docker compose up"), .docker)
+        XCTAssertEqual(Classifier.framework(arguments: "caddy run --config Caddyfile"), .caddy)
+        XCTAssertEqual(Classifier.framework(arguments: "nginx -g daemon off;"), .nginx)
+        XCTAssertEqual(Classifier.framework(arguments: "bun run dev"), .bun)
+        XCTAssertEqual(Classifier.framework(arguments: "deno run --allow-net server.ts"), .deno)
+        XCTAssertEqual(Classifier.framework(arguments: "ruby app.rb"), .ruby)
     }
 
     func testKindClassification() {
@@ -105,5 +181,21 @@ final class ProjectNamerTests: XCTestCase {
     func testRootAndHomeAreNotProjects() {
         XCTAssertNil(ProjectNamer.projectName(cwd: "/"))
         XCTAssertNil(ProjectNamer.projectName(cwd: NSHomeDirectory()))
+    }
+
+    func testFallsBackToFolderNameWhenManifestExists() throws {
+        let dir = NSTemporaryDirectory() + "portside-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        FileManager.default.createFile(atPath: dir + "/Cargo.toml", contents: Data())
+        XCTAssertEqual(ProjectNamer.projectName(cwd: dir), (dir as NSString).lastPathComponent)
+    }
+
+    func testFallsBackToFolderNameWhenProjectFileExists() throws {
+        let dir = NSTemporaryDirectory() + "portside-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        FileManager.default.createFile(atPath: dir + "/MyApp.xcodeproj", contents: Data())
+        XCTAssertEqual(ProjectNamer.projectName(cwd: dir), (dir as NSString).lastPathComponent)
     }
 }
