@@ -214,7 +214,7 @@ private struct DashboardRow: View {
 
             if isKilling {
                 ProgressView().controlSize(.small).frame(width: 88)
-            } else {
+            } else if hovering {
                 HStack(spacing: 2) {
                     rowAction("safari", help: "Open in browser") {
                         NSWorkspace.shared.open(server.localURL)

@@ -46,7 +46,6 @@ struct QRPanel: View {
                     .controlSize(.small)
 
                     Button("Done") {
-                        if share.isRelayed { model.stopSharing(port: server.port) }
                         dismiss()
                     }
                     .buttonStyle(.borderedProminent)
@@ -68,5 +67,13 @@ struct QRPanel: View {
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
         .onAppear { share = model.startSharing(server) }
+        .onDisappear {
+            // Covers every dismissal path — the Done button, a popover
+            // dismissed by clicking away, ServerRow's toggle-to-close — not
+            // just the ones that explicitly call `dismiss()`.
+            if share?.isRelayed == true {
+                model.stopSharing(port: server.port)
+            }
+        }
     }
 }
