@@ -18,7 +18,8 @@ public struct ProcessDetails: Sendable, Equatable {
     /// First token of args — wrong for paths containing spaces, so scanners
     /// should prefer the `ps -o comm=` value where available.
     public var executable: String {
-        String(arguments.split(separator: " ", maxSplits: 1)[0])
+        guard let first = arguments.split(separator: " ", maxSplits: 1).first else { return "" }
+        return String(first)
     }
 }
 
